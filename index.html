@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台股損益兩平計算機 | 股票 & ETF 交易成本試算</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Inter & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+          },
+          colors: {
+            twRed: '#dc2626',    // 台灣股市：紅漲獲利
+            twGreen: '#16a34a',  // 台灣股市：綠跌虧損
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* 移除數字輸入框上下微調箭頭 */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen antialiased flex flex-col justify-between selection:bg-rose-100 selection:text-rose-800">
+
+  <!-- 頂部導航列 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center text-white shadow-sm font-bold text-lg">
+          台
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 tracking-tight">台股損益兩平計算機</h1>
+          <p class="text-xs text-slate-500 hidden sm:block">含 ETF 優惠稅率、當沖減半、券商低消與台股跳動檔位規則</p>
+        </div>
+      </div>
+      
+      <!-- 快速重設按鈕 -->
+      <button id="btnResetDefault" type="button" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+        <svg class="w-3.5 h-3.5 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        載入 00631L 範例
+      </button>
+    </div>
+  </header>
+
+  <!-- 主內容容器 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- 左側欄位：參數設定面板 (5 Cols) -->
+      <div class="lg:col-span-5 space-y-5">
+        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-sm space-y-5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 class="text-base font-bold text-slate-900 flex items-center">
+              <span class="w-2 h-4 bg-rose-600 rounded-full mr-2"></span>
+              交易參數設定
+            </h2>
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">即時自動計算</span>
+          </div>
+
+          <!-- 1. 標的類型 -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">1. 標的類型</label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="relative flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all border-slate-200 hover:border-slate-300 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-50/30">
+                <input type="radio" name="targetType" value="stock" class="sr-only" id="typeStock">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-sm text-slate-800">個股 (一般股票)</span>
+                  <span class="text-[11px] font-semibold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded">稅率 0.3%</span>
+                </div>
+                <span class="text-xs text-slate-500 mt-1">一般上市櫃股票標的</span>
+              </label>
+
+              <label class="relative flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all border-slate-200 hover:border-slate-300 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-50/30">
+                <input type="radio" name="targetType" value="etf" class="sr-only" id="typeETF" checked>
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-sm text-slate-800">ETF (指數型基金)</span>
+                  <span class="text-[11px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">稅率 0.1%</span>
+                </div>
+                <span class="text-xs text-slate-500 mt-1">如 0050、00631L 等</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 2. 買入平均成本 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="costPrice" class="text-xs font-semibold text-slate-600 uppercase tracking-wider">2. 買入平均成本 (元)</label>
+              <span id="currentTickSizeBadge" class="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded">當前檔位跳動: 0.01元</span>
+            </div>
+            <div class="relative rounded-xl shadow-xs">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-semibold">NT$</div>
+              <input type="number" id="costPrice" step="0.01" min="0.01" value="36.71" class="block w-full pl-12 pr-28 py-2.5 text-slate-900 text-lg font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500 bg-white">
+              <div class="absolute inset-y-1 right-1 flex items-center space-x-1">
+                <button type="button" id="btnCostMinus" class="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">-1檔</button>
+                <button type="button" id="btnCostPlus" class="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">+1檔</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 持有數量 (張數 / 零股) -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-semibold text-slate-600 uppercase tracking-wider">3. 持有數量</label>
+              <div class="inline-flex p-0.5 bg-slate-100 rounded-lg text-xs font-medium">
+                <button type="button" id="btnUnitLots" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs">整張 (1000股)</button>
+                <button type="button" id="btnUnitShares" class="px-2.5 py-1 rounded-md text-slate-500 hover:text-slate-800">零股 (股數)</button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="relative rounded-xl shadow-xs">
+                <input type="number" id="quantityInput" min="1" step="1" value="135" class="block w-full px-3.5 py-2.5 text-slate-900 text-base font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500 bg-white">
+                <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500 text-sm font-medium" id="unitLabel">
+                  張 (135,000 股)
+                </div>
+              </div>
+
+              <!-- 快捷張數點選標籤 -->
+              <div class="flex flex-wrap gap-1.5 pt-0.5" id="presetQtyContainer">
+                <button type="button" class="preset-qty px-2.5 py-1 text-xs rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium" data-qty="1">1 張</button>
+                <button type="button" class="preset-qty px-2.5 py-1 text-xs rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium" data-qty="5">5 張</button>
+                <button type="button" class="preset-qty px-2.5 py-1 text-xs rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium" data-qty="10">10 張</button>
+                <button type="button" class="preset-qty px-2.5 py-1 text-xs rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium" data-qty="50">50 張</button>
+                <button type="button" class="preset-qty px-2.5 py-1 text-xs rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold" data-qty="135">135 張</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 券商手續費折扣 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-semibold text-slate-600 uppercase tracking-wider">4. 券商手續費折扣 (牌告 0.1425%)</label>
+              <span id="discountTextBadge" class="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">無折扣 (100%)</span>
+            </div>
+            
+            <div class="grid grid-cols-4 gap-2 mb-2">
+              <button type="button" class="discount-btn active-discount py-2 text-xs font-bold rounded-xl border border-slate-300 bg-slate-900 text-white transition" data-discount="1">無折扣</button>
+              <button type="button" class="discount-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition" data-discount="0.6">6 折</button>
+              <button type="button" class="discount-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition" data-discount="0.5">5 折</button>
+              <button type="button" class="discount-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition" data-discount="0.28">2.8 折</button>
+            </div>
+
+            <!-- 自訂折扣輸入 -->
+            <div class="flex items-center space-x-2">
+              <span class="text-xs text-slate-500 whitespace-nowrap">自訂折數:</span>
+              <div class="relative flex-1">
+                <input type="number" id="customDiscountInput" min="0" max="10" step="0.1" placeholder="例如: 3.5 折" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-1 focus:ring-rose-500">
+              </div>
+              <span class="text-xs text-slate-400">折</span>
+            </div>
+          </div>
+
+          <!-- 5. 進階選項：券商最低手續費 & 當沖減半 -->
+          <div class="pt-2 border-t border-slate-100 space-y-3">
+            <!-- 單筆最低手續費 20 元 -->
+            <div class="flex items-center justify-between bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
+              <div class="flex flex-col">
+                <span class="text-xs font-bold text-slate-800">券商單筆低消限制</span>
+                <span class="text-[11px] text-slate-500">不足最低門檻時以此金額計算</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <div class="flex items-center">
+                  <span class="text-xs text-slate-600 mr-1">$</span>
+                  <input type="number" id="minFeeValue" value="20" min="0" max="100" class="w-12 text-center text-xs font-semibold border border-slate-300 rounded-lg py-1 bg-white focus:ring-1 focus:ring-rose-500">
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="minFeeToggle" class="sr-only peer" checked>
+                  <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 現股當沖證交稅減半 -->
+            <div class="flex items-center justify-between bg-slate-50/80 p-3 rounded-xl border border-slate-200/70" id="dayTradingContainer">
+              <div class="flex flex-col">
+                <div class="flex items-center space-x-1.5">
+                  <span class="text-xs font-bold text-slate-800">現股當沖交易</span>
+                  <span class="text-[10px] bg-red-100 text-twRed font-bold px-1.5 py-0.2 rounded" id="dayTradingBadge">稅率減半</span>
+                </div>
+                <span class="text-[11px] text-slate-500" id="dayTradingDesc">個股證交稅降為 0.15%（ETF 固定 0.1%）</span>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="dayTradingToggle" class="sr-only peer">
+                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右側欄位：計算結果、周邊檔位與模擬器 (7 Cols) -->
+      <div class="lg:col-span-7 space-y-5">
+        
+        <!-- 核心兩平價看板 (Hero Card) -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-xl relative overflow-hidden">
+          <!-- 背景光暈裝飾 -->
+          <div class="absolute -right-12 -top-12 w-48 h-48 bg-rose-500/10 rounded-full blur-2xl"></div>
+          <div class="absolute -left-12 -bottom-12 w-48 h-48 bg-amber-500/10 rounded-full blur-2xl"></div>
+
+          <div class="relative z-10 space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/60 pb-4">
+              <div>
+                <span class="text-xs uppercase tracking-widest text-slate-400 font-semibold">Break-Even Execution Price</span>
+                <h3 class="text-lg font-bold text-slate-100">撮合損益兩平賣出價</h3>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span id="taxRateBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-amber-300 border border-amber-400/30">
+                  證交稅 0.1% (ETF)
+                </span>
+                <button id="btnCopyPrice" class="inline-flex items-center px-2.5 py-1 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  複製兩平價
+                </button>
+              </div>
+            </div>
+
+            <!-- 主數字區塊 -->
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+              <div class="sm:col-span-7">
+                <div class="text-xs text-slate-400 mb-1 flex items-center">
+                  <span>建議掛單賣出價（對齊台股跳動檔位）</span>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                  <span class="text-5xl sm:text-6xl font-extrabold tracking-tight text-white font-mono" id="breakEvenTickPrice">36.86</span>
+                  <span class="text-lg text-slate-300 font-semibold">元</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center space-x-2">
+                  <span>理論連續兩平點：</span>
+                  <span class="font-mono text-slate-200 font-semibold" id="theoreticalPrice">36.8517 元</span>
+                </div>
+              </div>
+
+              <!-- 檔位差距與獲利 -->
+              <div class="sm:col-span-5 bg-slate-800/80 rounded-2xl p-4 border border-slate-700/70 space-y-2">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-slate-400">需上漲檔數</span>
+                  <span class="font-bold text-amber-400 font-mono text-sm" id="tickCountDiff">+15 檔 (+0.15元)</span>
+                </div>
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-slate-400">兩平點淨獲利</span>
+                  <span class="font-bold text-rose-400 font-mono text-sm" id="profitAtTick">+1,121 元</span>
+                </div>
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-slate-400">兩平點報酬率</span>
+                  <span class="font-bold text-rose-400 font-mono" id="roiAtTick">+0.02%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 費用明細條目 -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                <span class="block text-[11px] text-slate-400">買入總成本 (含手續費)</span>
+                <span class="text-sm font-bold text-slate-100 font-mono mt-0.5 block" id="summaryTotalCost">$4,962,912</span>
+              </div>
+              <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                <span class="block text-[11px] text-slate-400">買進手續費</span>
+                <span class="text-sm font-bold text-slate-100 font-mono mt-0.5 block" id="summaryBuyFee">$7,062</span>
+              </div>
+              <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                <span class="block text-[11px] text-slate-400">賣出手續費 (兩平價)</span>
+                <span class="text-sm font-bold text-slate-100 font-mono mt-0.5 block" id="summarySellFee">$7,091</span>
+              </div>
+              <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                <span class="block text-[11px] text-slate-400">預估證交稅 (兩平價)</span>
+                <span class="text-sm font-bold text-amber-300 font-mono mt-0.5 block" id="summaryTax">$4,976</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 自訂目標價試算器 (Custom Sell Simulator) -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center">
+              <svg class="w-4 h-4 mr-1.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              自訂目標賣出價試算
+            </h3>
+            <span class="text-xs text-slate-500">輸入任意預期賣出價看損益</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+            <div class="sm:col-span-5 relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-semibold text-xs">賣價 NT$</div>
+              <input type="number" id="customSellPriceInput" step="0.01" class="w-full pl-16 pr-3 py-2 text-slate-900 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500">
+            </div>
+
+            <div class="sm:col-span-7 flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
+              <div>
+                <span class="text-slate-500 block">試算淨損益</span>
+                <span class="font-mono font-bold text-sm" id="customProfitOutput">+0 元</span>
+              </div>
+              <div class="text-right">
+                <span class="text-slate-500 block">投資報酬率 (ROI)</span>
+                <span class="font-mono font-bold text-sm" id="customRoiOutput">+0.00%</span>
+              </div>
+              <div class="text-right">
+                <span class="text-slate-500 block">實收金額</span>
+                <span class="font-mono font-semibold text-slate-800" id="customNetRevenueOutput">$0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 周邊檔位梯形損益表 (Price Ladder Table) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">兩平價周邊檔位試算表 (Price Ladder)</h3>
+              <p class="text-[11px] text-slate-500">快速查閱兩平點前、後跳動檔位之淨利變化</p>
+            </div>
+            <span class="text-xs text-slate-400 font-medium">台幣單位</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3">檔位偏移</th>
+                  <th class="py-2.5 px-3">賣出單價</th>
+                  <th class="py-2.5 px-3">證交稅</th>
+                  <th class="py-2.5 px-3">賣出手續費</th>
+                  <th class="py-2.5 px-3">賣出實收</th>
+                  <th class="py-2.5 px-3 text-right">預估損益</th>
+                  <th class="py-2.5 px-3 text-right">報酬率</th>
+                </tr>
+              </thead>
+              <tbody id="priceLadderBody" class="divide-y divide-slate-100 font-mono">
+                <!-- 動態注入檔位清單 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- 提示浮動通知框 (Toast) -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white text-xs font-medium px-4 py-2.5 rounded-xl shadow-lg transform translate-y-16 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+    已複製損益兩平價至剪貼簿！
+  </div>
+
+  <!-- 頁腳說明 -->
+  <footer class="bg-white border-t border-slate-200 mt-10 py-4">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-400">
+      台股法規提醒：ETF 證券交易稅為 0.1%，現股為 0.3%（當沖降為 0.15%）。法定手續費牌告上限為 0.1425%。各項稅費均採現行法規無條件捨去或四捨五入計算，實際成交費用請以券商交割單為準。
+    </div>
+  </footer>
+
+  <!-- 核心計算與互動邏輯腳本 -->
+  <script>
+    // --- 狀態管理 ---
+    const state = {
+      targetType: 'etf',        // 'stock' | 'etf'
+      costPrice: 36.71,
+      isLots: true,             // true: 張 (1000 shares), false: 股
+      quantity: 135,
+      discount: 1.0,            // 1.0 = 100%
+      enableMinFee: true,
+      minFeeAmount: 20,
+      isDayTrading: false,
+      customSellPrice: null
+    };
+
+    // DOM 元素引用
+    const dom = {
+      typeStock: document.getElementById('typeStock'),
+      typeETF: document.getElementById('typeETF'),
+      costPrice: document.getElementById('costPrice'),
+      btnCostMinus: document.getElementById('btnCostMinus'),
+      btnCostPlus: document.getElementById('btnCostPlus'),
+      currentTickSizeBadge: document.getElementById('currentTickSizeBadge'),
+      quantityInput: document.getElementById('quantityInput'),
+      unitLabel: document.getElementById('unitLabel'),
+      btnUnitLots: document.getElementById('btnUnitLots'),
+      btnUnitShares: document.getElementById('btnUnitShares'),
+      presetQtyButtons: document.querySelectorAll('.preset-qty'),
+      discountButtons: document.querySelectorAll('.discount-btn'),
+      customDiscountInput: document.getElementById('customDiscountInput'),
+      discountTextBadge: document.getElementById('discountTextBadge'),
+      minFeeToggle: document.getElementById('minFeeToggle'),
+      minFeeValue: document.getElementById('minFeeValue'),
+      dayTradingToggle: document.getElementById('dayTradingToggle'),
+      dayTradingBadge: document.getElementById('dayTradingBadge'),
+      dayTradingDesc: document.getElementById('dayTradingDesc'),
+      breakEvenTickPrice: document.getElementById('breakEvenTickPrice'),
+      theoreticalPrice: document.getElementById('theoreticalPrice'),
+      tickCountDiff: document.getElementById('tickCountDiff'),
+      profitAtTick: document.getElementById('profitAtTick'),
+      roiAtTick: document.getElementById('roiAtTick'),
+      taxRateBadge: document.getElementById('taxRateBadge'),
+      summaryTotalCost: document.getElementById('summaryTotalCost'),
+      summaryBuyFee: document.getElementById('summaryBuyFee'),
+      summarySellFee: document.getElementById('summarySellFee'),
+      summaryTax: document.getElementById('summaryTax'),
+      customSellPriceInput: document.getElementById('customSellPriceInput'),
+      customProfitOutput: document.getElementById('customProfitOutput'),
+      customRoiOutput: document.getElementById('customRoiOutput'),
+      customNetRevenueOutput: document.getElementById('customNetRevenueOutput'),
+      priceLadderBody: document.getElementById('priceLadderBody'),
+      btnCopyPrice: document.getElementById('btnCopyPrice'),
+      btnResetDefault: document.getElementById('btnResetDefault'),
+      toast: document.getElementById('toast')
+    };
+
+    // --- 台灣證券交易所 (TWSE) 最小跳動檔位規則 ---
+    function getTickSize(price, type) {
+      const p = Number(price);
+      if (type === 'etf') {
+        // ETF 檔位：未滿 50 元一律為 0.01 元
+        if (p < 50) return 0.01;
+        if (p < 100) return 0.05;
+        if (p < 500) return 0.1;
+        if (p < 1000) return 0.5;
+        return 1.0;
+      } else {
+        // 一般股票 (個股) 檔位
+        if (p < 10) return 0.01;
+        if (p < 50) return 0.05;
+        if (p < 100) return 0.1;
+        if (p < 500) return 0.5;
+        if (p < 1000) return 1.0;
+        return 5.0;
+      }
+    }
+
+    // 取得下一個跳動價位
+    function stepTick(price, type, direction = 1) {
+      let p = Number(price);
+      let tick = getTickSize(p, type);
+      
+      if (direction > 0) {
+        // 向上跳檔
+        p = Math.round((p + tick) * 1000) / 1000;
+      } else {
+        // 向下跳檔需要注意邊界變化 (例如 50 元往下變 49.99 或 49.95)
+        // 先測試減去極小值以獲得前一個區間的 tick size
+        let testP = Math.round((p - 0.0001) * 1000) / 1000;
+        let prevTick = getTickSize(testP, type);
+        p = Math.round((p - prevTick) * 1000) / 1000;
+      }
+      return Math.max(0.01, p);
+    }
+
+    // 格式化跳動檔位小數點
+    function formatPrice(p, tickSize) {
+      if (tickSize >= 1) return p.toFixed(tickSize === 1 ? 1 : 0);
+      if (tickSize === 0.5) return p.toFixed(1);
+      if (tickSize === 0.1) return p.toFixed(1);
+      return p.toFixed(2);
+    }
+
+    // --- 手續費與證交稅計算法則 ---
+    function calculateFee(tradeAmount, discount, minFeeActive, minFeeVal) {
+      let rawFee = Math.floor(tradeAmount * 0.001425 * discount);
+      if (minFeeActive) {
+        return Math.max(minFeeVal, rawFee);
+      }
+      return rawFee;
+    }
+
+    function getTaxRate() {
+      if (state.targetType === 'etf') {
+        return 0.001; // ETF 0.1%
+      }
+      // 個股
+      if (state.isDayTrading) {
+        return 0.0015; // 當沖減半 0.15%
+      }
+      return 0.003; // 個股一般 0.3%
+    }
+
+    function calculateTax(sellAmount) {
+      const rate = getTaxRate();
+      return Math.floor(sellAmount * rate);
+    }
+
+    // 計算特定賣出價位的完整財務結果
+    function evaluatePrice(sellPrice, totalShares, totalBuyCost) {
+      const sellAmount = sellPrice * totalShares;
+      const sellFee = calculateFee(sellAmount, state.discount, state.enableMinFee, state.minFeeAmount);
+      const sellTax = calculateTax(sellAmount);
+      const netSellRevenue = sellAmount - sellFee - sellTax;
+      const profit = netSellRevenue - totalBuyCost;
+      const roi = totalBuyCost > 0 ? (profit / totalBuyCost) * 100 : 0;
+
+      return {
+        sellPrice,
+        sellAmount,
+        sellFee,
+        sellTax,
+        netSellRevenue,
+        profit,
+        roi
+      };
+    }
+
+    // --- 尋找符合證交所撮合機制的最佳損益兩平檔位 ---
+    function findBreakEvenTick(costPrice, totalShares, totalBuyCost) {
+      const taxRate = getTaxRate();
+      const effectiveRate = 0.001425 * state.discount + taxRate;
+      
+      // 理論連續解 (不考慮低消取整時的下限估算)
+      let theoretical = (totalBuyCost / totalShares) / (1 - effectiveRate);
+      
+      // 從理論價開始，向對齊檔位向上尋找
+      let candidate = Math.max(0.01, theoretical);
+      let tick = getTickSize(candidate, state.targetType);
+      
+      // 取天花板整數倍檔位
+      let aligned = Math.ceil(candidate / tick) * tick;
+      aligned = Math.round(aligned * 100) / 100;
+
+      // 嚴格測試驗證：直到淨利 >= 0
+      while (true) {
+        const evalRes = evaluatePrice(aligned, totalShares, totalBuyCost);
+        if (evalRes.profit >= 0) {
+          break;
+        }
+        aligned = stepTick(aligned, state.targetType, 1);
+      }
+
+      return {
+        theoreticalPrice: theoretical,
+        breakEvenTickPrice: aligned
+      };
+    }
+
+    // --- 介面重繪主流程 ---
+    function render() {
+      const totalShares = state.isLots ? state.quantity * 1000 : state.quantity;
+      const buyTradeAmount = state.costPrice * totalShares;
+      const buyFee = calculateFee(buyTradeAmount, state.discount, state.enableMinFee, state.minFeeAmount);
+      const totalBuyCost = buyTradeAmount + buyFee;
+
+      // 1. 更新跳動規格標籤
+      const currentTick = getTickSize(state.costPrice, state.targetType);
+      dom.currentTickSizeBadge.textContent = `當前檔位跳動: ${currentTick}元`;
+
+      // 2. 更新稅率 Badge
+      const taxRate = getTaxRate();
+      if (state.targetType === 'etf') {
+        dom.taxRateBadge.textContent = '證交稅 0.1% (ETF 優惠)';
+        dom.taxRateBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-amber-300 border border-amber-400/30';
+        dom.dayTradingDesc.textContent = 'ETF 法定稅率已為 0.1% 優惠稅率（當沖同為 0.1%）';
+      } else {
+        if (state.isDayTrading) {
+          dom.taxRateBadge.textContent = '證交稅 0.15% (現股當沖減半)';
+          dom.taxRateBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-500/50';
+          dom.dayTradingDesc.textContent = '現股當沖已啟用：證交稅由 0.3% 降為 0.15%';
+        } else {
+          dom.taxRateBadge.textContent = '證交稅 0.3% (個股標準)';
+          dom.taxRateBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-600/40';
+          dom.dayTradingDesc.textContent = '勾選後證交稅將減半至 0.15%';
+        }
+      }
+
+      // 3. 計算兩平價
+      const { theoreticalPrice, breakEvenTickPrice } = findBreakEvenTick(state.costPrice, totalShares, totalBuyCost);
+      const evalAtBreakEven = evaluatePrice(breakEvenTickPrice, totalShares, totalBuyCost);
+
+      // 計算檔位差距
+      const priceDiff = Math.round((breakEvenTickPrice - state.costPrice) * 100) / 100;
+      let ticksCount = 0;
+      let cursor = state.costPrice;
+      if (priceDiff > 0) {
+        while (cursor < breakEvenTickPrice - 0.0001) {
+          cursor = stepTick(cursor, state.targetType, 1);
+          ticksCount++;
+        }
+      } else if (priceDiff < 0) {
+        while (cursor > breakEvenTickPrice + 0.0001) {
+          cursor = stepTick(cursor, state.targetType, -1);
+          ticksCount--;
+        }
+      }
+
+      // 4. 渲染 Hero Card 數值
+      const tickSizeBE = getTickSize(breakEvenTickPrice, state.targetType);
+      dom.breakEvenTickPrice.textContent = formatPrice(breakEvenTickPrice, tickSizeBE);
+      dom.theoreticalPrice.textContent = `${theoreticalPrice.toFixed(4)} 元`;
+      dom.tickCountDiff.textContent = `${ticksCount >= 0 ? '+' : ''}${ticksCount} 檔 (${priceDiff >= 0 ? '+' : ''}${priceDiff.toFixed(2)}元)`;
+      
+      const profitVal = evalAtBreakEven.profit;
+      dom.profitAtTick.textContent = `${profitVal >= 0 ? '+' : ''}${profitVal.toLocaleString()} 元`;
+      dom.roiAtTick.textContent = `${evalAtBreakEven.roi >= 0 ? '+' : ''}${evalAtBreakEven.roi.toFixed(2)}%`;
+
+      // 明細卡
+      dom.summaryTotalCost.textContent = `$${totalBuyCost.toLocaleString()}`;
+      dom.summaryBuyFee.textContent = `$${buyFee.toLocaleString()}`;
+      dom.summarySellFee.textContent = `$${evalAtBreakEven.sellFee.toLocaleString()}`;
+      dom.summaryTax.textContent = `$${evalAtBreakEven.sellTax.toLocaleString()}`;
+
+      // 5. 渲染自訂目標價試算 (預設值帶入兩平價若未設定)
+      if (state.customSellPrice === null || isNaN(state.customSellPrice)) {
+        state.customSellPrice = breakEvenTickPrice;
+        dom.customSellPriceInput.value = breakEvenTickPrice;
+      }
+      renderCustomSellSimulation(totalShares, totalBuyCost);
+
+      // 6. 渲染周邊檔位梯形表
+      renderPriceLadder(breakEvenTickPrice, totalShares, totalBuyCost);
+    }
+
+    // 渲染自訂賣出價結果
+    function renderCustomSellSimulation(totalShares, totalBuyCost) {
+      const customPrice = parseFloat(dom.customSellPriceInput.value) || 0;
+      if (customPrice <= 0) {
+        dom.customProfitOutput.textContent = '--';
+        dom.customRoiOutput.textContent = '--';
+        dom.customNetRevenueOutput.textContent = '$0';
+        return;
+      }
+
+      const res = evaluatePrice(customPrice, totalShares, totalBuyCost);
+      const isProfit = res.profit >= 0;
+
+      dom.customProfitOutput.textContent = `${isProfit ? '+' : ''}${res.profit.toLocaleString()} 元`;
+      dom.customProfitOutput.className = `font-mono font-bold text-sm ${isProfit ? 'text-twRed' : 'text-twGreen'}`;
+
+      dom.customRoiOutput.textContent = `${isProfit ? '+' : ''}${res.roi.toFixed(2)}%`;
+      dom.customRoiOutput.className = `font-mono font-bold text-sm ${isProfit ? 'text-twRed' : 'text-twGreen'}`;
+
+      dom.customNetRevenueOutput.textContent = `$${res.netSellRevenue.toLocaleString()}`;
+    }
+
+    // 渲染周邊檔位梯形表 (產生 -2, -1, 兩平點, +1, +2, +3, +5 檔)
+    function renderPriceLadder(bePrice, totalShares, totalBuyCost) {
+      // 構建位移檔位序列
+      const offsets = [-3, -2, -1, 0, 1, 2, 3, 5, 10];
+      const ladderRows = [];
+
+      offsets.forEach(offset => {
+        let p = bePrice;
+        if (offset > 0) {
+          for (let i = 0; i < offset; i++) {
+            p = stepTick(p, state.targetType, 1);
+          }
+        } else if (offset < 0) {
+          for (let i = 0; i < Math.abs(offset); i++) {
+            p = stepTick(p, state.targetType, -1);
+          }
+        }
+        
+        // 評估數據
+        const res = evaluatePrice(p, totalShares, totalBuyCost);
+        ladderRows.push({
+          offset,
+          price: p,
+          res
+        });
+      });
+
+      // 繪製 HTML
+      let html = '';
+      ladderRows.forEach(item => {
+        const isBE = item.offset === 0;
+        const isWin = item.res.profit >= 0;
+        const tickSize = getTickSize(item.price, state.targetType);
+        const formattedPrice = formatPrice(item.price, tickSize);
+
+        let rowBg = 'hover:bg-slate-50';
+        let badge = `<span class="text-slate-500 font-sans">${item.offset > 0 ? '+' : ''}${item.offset} 檔</span>`;
+
+        if (isBE) {
+          rowBg = 'bg-rose-50/70 hover:bg-rose-50 font-bold border-l-4 border-l-rose-500';
+          badge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white font-sans">兩平點 ★</span>`;
+        }
+
+        html += `
+          <tr class="${rowBg} transition-colors cursor-pointer" onclick="selectLadderPrice(${item.price})">
+            <td class="py-2.5 px-3 whitespace-nowrap">${badge}</td>
+            <td class="py-2.5 px-3 font-bold text-slate-900">${formattedPrice} 元</td>
+            <td class="py-2.5 px-3 text-slate-500">$${item.res.sellTax.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-slate-500">$${item.res.sellFee.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-slate-700 font-semibold">$${item.res.netSellRevenue.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-right font-bold ${isWin ? 'text-twRed' : 'text-twGreen'}">
+              ${isWin ? '+' : ''}${item.res.profit.toLocaleString()}
+            </td>
+            <td class="py-2.5 px-3 text-right font-bold ${isWin ? 'text-twRed' : 'text-twGreen'}">
+              ${isWin ? '+' : ''}${item.res.roi.toFixed(2)}%
+            </td>
+          </tr>
+        `;
+      });
+
+      dom.priceLadderBody.innerHTML = html;
+    }
+
+    // 點選周邊梯形表價格快速帶入自訂模擬
+    window.selectLadderPrice = function(price) {
+      dom.customSellPriceInput.value = price;
+      state.customSellPrice = price;
+      const totalShares = state.isLots ? state.quantity * 1000 : state.quantity;
+      const buyFee = calculateFee(state.costPrice * totalShares, state.discount, state.enableMinFee, state.minFeeAmount);
+      const totalBuyCost = (state.costPrice * totalShares) + buyFee;
+      renderCustomSellSimulation(totalShares, totalBuyCost);
+      showToast(`已帶入賣出價：${price} 元`);
+    };
+
+    // --- 事件監聽器設定 ---
+    function setupEventListeners() {
+      // 標的切換
+      dom.typeStock.addEventListener('change', () => {
+        state.targetType = 'stock';
+        render();
+      });
+      dom.typeETF.addEventListener('change', () => {
+        state.targetType = 'etf';
+        render();
+      });
+
+      // 成本價格輸入
+      dom.costPrice.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val > 0) {
+          state.costPrice = val;
+          render();
+        }
+      });
+
+      // 成本 ±1 檔微調
+      dom.btnCostMinus.addEventListener('click', () => {
+        const nextP = stepTick(state.costPrice, state.targetType, -1);
+        state.costPrice = nextP;
+        dom.costPrice.value = nextP;
+        render();
+      });
+      dom.btnCostPlus.addEventListener('click', () => {
+        const nextP = stepTick(state.costPrice, state.targetType, 1);
+        state.costPrice = nextP;
+        dom.costPrice.value = nextP;
+        render();
+      });
+
+      // 單位切換 (張數 / 零股)
+      dom.btnUnitLots.addEventListener('click', () => {
+        state.isLots = true;
+        dom.btnUnitLots.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs';
+        dom.btnUnitShares.className = 'px-2.5 py-1 rounded-md text-slate-500 hover:text-slate-800';
+        dom.unitLabel.textContent = `張 (${(state.quantity * 1000).toLocaleString()} 股)`;
+        render();
+      });
+
+      dom.btnUnitShares.addEventListener('click', () => {
+        state.isLots = false;
+        dom.btnUnitShares.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs';
+        dom.btnUnitLots.className = 'px-2.5 py-1 rounded-md text-slate-500 hover:text-slate-800';
+        dom.unitLabel.textContent = '股 (零股)';
+        render();
+      });
+
+      // 數量輸入
+      dom.quantityInput.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val) && val > 0) {
+          state.quantity = val;
+          if (state.isLots) {
+            dom.unitLabel.textContent = `張 (${(val * 1000).toLocaleString()} 股)`;
+          }
+          render();
+        }
+      });
+
+      // 快捷數量按鈕
+      dom.presetQtyButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const qty = parseInt(btn.dataset.qty, 10);
+          state.quantity = qty;
+          state.isLots = true;
+          dom.quantityInput.value = qty;
+          dom.unitLabel.textContent = `張 (${(qty * 1000).toLocaleString()} 股)`;
+          dom.btnUnitLots.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs';
+          dom.btnUnitShares.className = 'px-2.5 py-1 rounded-md text-slate-500 hover:text-slate-800';
+          render();
+        });
+      });
+
+      // 折扣選擇
+      dom.discountButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          dom.discountButtons.forEach(b => {
+            b.className = 'discount-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition';
+          });
+          btn.className = 'discount-btn active-discount py-2 text-xs font-bold rounded-xl border border-slate-300 bg-slate-900 text-white transition';
+          dom.customDiscountInput.value = '';
+          
+          state.discount = parseFloat(btn.dataset.discount);
+          dom.discountTextBadge.textContent = btn.textContent;
+          render();
+        });
+      });
+
+      // 自訂折扣
+      dom.customDiscountInput.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val > 0 && val <= 10) {
+          dom.discountButtons.forEach(b => {
+            b.className = 'discount-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition';
+          });
+          state.discount = val / 10;
+          dom.discountTextBadge.textContent = `自訂 ${val} 折`;
+          render();
+        }
+      });
+
+      // 最低手續費開關與金額
+      dom.minFeeToggle.addEventListener('change', (e) => {
+        state.enableMinFee = e.target.checked;
+        render();
+      });
+      dom.minFeeValue.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val) && val >= 0) {
+          state.minFeeAmount = val;
+          render();
+        }
+      });
+
+      // 當沖開關
+      dom.dayTradingToggle.addEventListener('change', (e) => {
+        state.isDayTrading = e.target.checked;
+        render();
+      });
+
+      // 自訂賣價輸入
+      dom.customSellPriceInput.addEventListener('input', () => {
+        const totalShares = state.isLots ? state.quantity * 1000 : state.quantity;
+        const buyFee = calculateFee(state.costPrice * totalShares, state.discount, state.enableMinFee, state.minFeeAmount);
+        const totalBuyCost = (state.costPrice * totalShares) + buyFee;
+        renderCustomSellSimulation(totalShares, totalBuyCost);
+      });
+
+      // 複製兩平價
+      dom.btnCopyPrice.addEventListener('click', () => {
+        const price = dom.breakEvenTickPrice.textContent.trim();
+        copyToClipboard(price);
+      });
+
+      // 重設至 00631L 預設值
+      dom.btnResetDefault.addEventListener('click', () => {
+        state.targetType = 'etf';
+        state.costPrice = 36.71;
+        state.isLots = true;
+        state.quantity = 135;
+        state.discount = 1.0;
+        state.enableMinFee = true;
+        state.minFeeAmount = 20;
+        state.isDayTrading = false;
+        state.customSellPrice = null;
+
+        dom.typeETF.checked = true;
+        dom.costPrice.value = 36.71;
+        dom.quantityInput.value = 135;
+        dom.minFeeToggle.checked = true;
+        dom.minFeeValue.value = 20;
+        dom.dayTradingToggle.checked = false;
+        dom.customDiscountInput.value = '';
+
+        dom.discountButtons.forEach((b, idx) => {
+          if (idx === 0) {
+            b.className = 'discount-btn active-discount py-2 text-xs font-bold rounded-xl border border-slate-300 bg-slate-900 text-white transition';
+          } else {
+            b.className = 'discount-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition';
+          }
+        });
+
+        render();
+        showToast('已載入 00631L 預設計算情境！');
+      });
+    }
+
+    // 複製輔助功能 (使用相容 document.execCommand 方案)
+    function copyToClipboard(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast(`已複製兩平價 NT$ ${text}！`);
+      } catch (err) {
+        showToast('複製失敗，請手動複製');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    // Toast 通知浮水印
+    function showToast(msg) {
+      dom.toast.textContent = msg;
+      dom.toast.classList.remove('translate-y-16', 'opacity-0');
+      dom.toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        dom.toast.classList.remove('translate-y-0', 'opacity-100');
+        dom.toast.classList.add('translate-y-16', 'opacity-0');
+      }, 2000);
+    }
+
+    // 初始化應用程式
+    window.onload = function () {
+      setupEventListeners();
+      render();
+    };
+  </script>
+</body>
+</html>
